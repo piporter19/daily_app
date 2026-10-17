@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Which dashboard an account owns ("my_dashboard" or "soham_dashboard").
+    // You create these by hand in the console (SECURITY-SETUP.md, step 3). The app can read its own, never write.
+    match /owners/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // The tracker itself: "<dash>", "<dash>-mem-<id>" (photos). Signed in as the owner, or nothing.
+    match /tracker_data/{docId} {
+      allow read, write: if request.auth != null
+        && exists(/databases/$(database)/documents/owners/$(request.auth.uid))
+        && (docId == get(/databases/$(database)/documents/owners/$(request.auth.uid)).data.dash
+            || docId.matches(get(/databases/$(database)/documents/owners/$(request.auth.uid)).data.dash + '-.*'));
+    }
+
+    // everything else is closed
+    match /{other=**} {
+      allow read, write: if false;
+    }
+  }
+}

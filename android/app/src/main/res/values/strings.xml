@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pip Tracker</string>
+    <string name="title_activity_main">Pip Tracker</string>
+    <string name="package_name">com.pip.tracker</string>
+    <string name="custom_url_scheme">com.pip.tracker</string>
+    <string name="focus_service_desc">Pip Tracker uses this only to notice which app is open during a focus session, so apps you did not allow can be covered. It does not read or store anything on your screen.</string>
+</resources>
