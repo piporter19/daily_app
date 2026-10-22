@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pip">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#12142a">
   <title>Personal Daily Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1253,7 +1260,7 @@
     // What protects the data is Firebase Auth (who you are) plus the Firestore rules (what you may touch).
     // ==========================================
     const firebaseConfig = {
-      apiKey: "AIzaSyAjIG30nPmTBBAZ7c7cmgeXn25BwdviEEA",
+      apiKey: "AIzaSyAjiG30nPmTBBAZ7c7cmgeXn25BwdviEEA",
       authDomain: "daily-tracker-bbee6.firebaseapp.com",
       projectId: "daily-tracker-bbee6",
       storageBucket: "daily-tracker-bbee6.firebasestorage.app",
@@ -1334,6 +1341,7 @@
       history.replaceState(null, '', location.pathname);
       return a;
     })();
+    if (!window.Capacitor?.isNativePlatform?.()) { const fbn = document.getElementById('focus-btn'); if (fbn) fbn.style.display = 'none'; }   // app blocking is Android-only
     function setupGate() {
       const g = $('auth-gate');
       g.classList.remove('go', 'out'); g.style.display = 'flex';
@@ -1406,19 +1414,21 @@
     window.checkPassword = async function (event) {
       event.preventDefault();
       if (signingIn) return;
-      const pw = $('password-input').value;
-      if (!pw) { gateWrong('Enter your password.'); return; }
+      // phone keyboards add stray spaces, capitals and curly quotes; tidy those before checking
+      const raw = $('password-input').value.trim().replace(/[\u2018\u2019\u02BC]/g, "'");
+      if (!raw) { gateWrong('Enter your password.'); return; }
+      const variants = raw === raw.toLowerCase() ? [raw] : [raw, raw.toLowerCase()];
       signingIn = true;
       const go = $('gate-form').querySelector('.gate-go'); if (go) go.disabled = true;
       try {
         rememberThis = $('remember-me').checked;
         await setPersistence(auth, rememberThis ? browserLocalPersistence : browserSessionPersistence);
         let cred = null, lastErr = null;
-        for (const email of ACCOUNTS) {
-          try { cred = await signInWithEmailAndPassword(auth, email, pw + PW_TAIL); break; }
-          catch (e) { lastErr = e; if (!/invalid-credential|wrong-password|user-not-found|invalid-login/.test(e?.code || '')) throw e; }
+        outer: for (const pw of variants) for (const email of ACCOUNTS) {
+          try { cred = await signInWithEmailAndPassword(auth, email, pw + PW_TAIL); break outer; }
+          catch (e) { lastErr = e; console.warn('Sign-in attempt failed', email, e?.code); if (!/invalid-credential|wrong-password|user-not-found|invalid-login/.test(e?.code || '')) throw e; }
         }
-        if (!cred) { gateWrong(); return; }
+        if (!cred) { gateWrong(`That password didn't match. (${(lastErr?.code || 'unknown').replace('auth/', '')})`); return; }
         // which dashboard belongs to this account is stored in Firestore, and the rules enforce it
         const own = await getDoc(doc(db, 'owners', cred.user.uid));
         const dash = own.exists() ? own.data().dash : null;
@@ -1427,7 +1437,7 @@
         beginSession(dash);
       } catch (e) {
         const c = e && e.code || '';
-        gateWrong(c === 'auth/network-request-failed' ? "Can't reach the server. Check your connection." : c === 'auth/too-many-requests' ? 'Too many tries. Wait a minute and try again.' : c === 'permission-denied' ? "Signed in, but the security rules don't allow this account yet. See SECURITY-SETUP.md." : null);
+        gateWrong(c === 'auth/network-request-failed' ? "Can't reach the server. Check your connection." : c === 'auth/too-many-requests' ? 'Too many tries. Wait a minute and try again.' : c === 'permission-denied' ? "Signed in, but the security rules don't allow this account yet. See SECURITY-SETUP.md." : `Sign-in failed (${c || e?.message || 'unknown'}).`);
       } finally { signingIn = false; if (go) go.disabled = false; }
     };
     window.quickBegin = async function () {
@@ -2911,7 +2921,7 @@
       }, 4500);
       setTimeout(maybeAutoReview, 8000);
     }
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !window.Capacitor?.isNativePlatform?.()) {
       navigator.serviceWorker.register('sw.js').then(r => { swReg = r; }).catch(() => { swReg = null; });
       navigator.serviceWorker.addEventListener('message', e => {
         if (e.data?.type !== 'nudge-action' || !currentNudge) return;
